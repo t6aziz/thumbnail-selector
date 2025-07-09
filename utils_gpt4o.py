@@ -8,6 +8,8 @@ to determine which frame would make the best thumbnail through visual analysis.
 import os
 import re
 import base64
+import sys
+import time
 from typing import List, Tuple, Dict, Optional
 from dotenv import load_dotenv
 import openai
@@ -269,24 +271,24 @@ def score_with_gpt4o(frames_data: List[Dict]) -> Tuple[Dict, float]:
     
     scores = []
     valid_frames = 0
+    total_frames = len(frames_data)
     
-    for frame_data in frames_data:
+    for i, frame_data in enumerate(frames_data):
         try:
-            score, explanation = scorer.score_image_pil(frame_data["frame"])
+            # Show progress for each frame (GPT-4o is slower)
             frame_name = f"frame_{frame_data['frame_number']:04d}"
+            print(f"⏳ Processing {frame_name} with GPT-4o... ({i + 1}/{total_frames})")
+            
+            score, explanation = scorer.score_image_pil(frame_data["frame"])
             scores.append((frame_data, score, explanation))
-            
-            print(f"📸 {frame_name}: {score:.4f}")
-            if explanation:
-                # Print first line of explanation
-                first_line = explanation.split('\n')[0]
-                print(f"   💭 {first_line}")
-            
+            print(f"✅ {frame_name}: {score:.4f}")
             valid_frames += 1
             
         except Exception as e:
             print(f"⚠️  Error processing frame {frame_data['frame_number']}: {e}")
             continue
+    
+    print(f"✅ Completed processing {valid_frames}/{total_frames} frames")
     
     if not scores:
         raise ValueError("No valid frames could be processed by GPT-4o")

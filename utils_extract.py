@@ -50,12 +50,20 @@ def extract_frames_in_memory(video_path: str, interval: float = 1.0) -> List[Dic
         saved_count = 0
         frames_data = []
         
+        # Get total frame count for progress tracking
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
         print(f"Extracting frames from '{video_path}' every {interval}s...")
         
         while True:
             success, frame = cap.read()
             if not success:
                 break
+            
+            # Show progress indicator every 10% or every 100 frames
+            if total_frames > 0 and (frame_count % max(1, total_frames // 10) == 0 or frame_count % 100 == 0):
+                progress = (frame_count / total_frames) * 100
+                print(f"⏳ Extracting frames... {progress:.0f}% ({frame_count}/{total_frames})")
             
             # Process frame at the specified interval
             if frame_count % frame_interval == 0:
@@ -77,7 +85,7 @@ def extract_frames_in_memory(video_path: str, interval: float = 1.0) -> List[Dic
             
             frame_count += 1
         
-        print(f"✅ Extracted {saved_count} frames in memory")
+        print(f"✅ Extracted {saved_count} frames in memory from {frame_count} total frames")
         return frames_data
         
     finally:
@@ -85,12 +93,13 @@ def extract_frames_in_memory(video_path: str, interval: float = 1.0) -> List[Dic
         cap.release()
 
 
-def upload_frame_to_imgur(pil_image: Image.Image) -> Optional[str]:
+def upload_frame_to_imgur(pil_image: Image.Image, verbose: bool = False) -> Optional[str]:
     """
     Upload a PIL Image to Imgur and return the URL.
     
     Args:
         pil_image: PIL Image to upload
+        verbose: Whether to show detailed error information
         
     Returns:
         URL of uploaded image, or None if upload failed
@@ -105,18 +114,44 @@ def upload_frame_to_imgur(pil_image: Image.Image) -> Optional[str]:
         img_b64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
         
         # Upload to Imgur (anonymous upload)
-        headers = {'Authorization': 'Client-ID 546c25a59c58ad7'}  # Public Imgur client ID
-        data = {'image': img_b64, 'type': 'base64'}
+        headers = {
+            'Authorization': 'Client-ID 546c25a59c58ad7',
+            'User-Agent': 'Thumbnail-Selector/1.0'
+        }
+        data = {'image': img_b64, 'type': 'base64', 'title': 'Video Thumbnail'}
         
-        response = requests.post('https://api.imgur.com/3/upload', headers=headers, data=data)
+        response = requests.post('https://api.imgur.com/3/upload', headers=headers, data=data, timeout=30)
+        
+        if verbose:
+            print(f"📡 Imgur response status: {response.status_code}")
+            print(f"📡 Response text: {response.text[:200]}...")
         
         if response.status_code == 200:
             result = response.json()
-            if result['success']:
-                return result['data']['link']
+            if result.get('success'):
+                # Get the image ID from the response
+                image_id = result['data']['id']
+                # Return the proper Imgur page URL (not direct image link)
+                url = f"https://imgur.com/{image_id}"
+                
+                if verbose:
+                    print(f"✅ Image uploaded successfully: {url}")
+                    direct_link = result['data']['link']
+                    print(f"📸 Direct image link: {direct_link}")
+                
+                return url
+        else:
+            if verbose:
+                print(f"⚠️  Upload failed with status {response.status_code}: {response.text}")
         
         return None
         
+    except requests.exceptions.Timeout:
+        print("⚠️  Upload timeout - please try again")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️  Network error during upload: {e}")
+        return None
     except Exception as e:
         print(f"⚠️  Failed to upload image: {e}")
         return None

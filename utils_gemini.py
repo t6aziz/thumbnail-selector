@@ -7,6 +7,8 @@ to determine which frame would make the best thumbnail through visual analysis.
 
 import os
 import re
+import sys
+import time
 from typing import List, Tuple, Optional, Dict
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -86,8 +88,16 @@ class GeminiScorer:
             if not images:
                 return None
             
+            # Show loading indicator while waiting for Gemini response
+            print("⏳ Analyzing frames with Gemini AI...")
+            start_time = time.time()
+            
             # Generate response from Gemini
             response = self.model.generate_content([prompt] + images)
+            
+            # Show completion time
+            elapsed_time = time.time() - start_time
+            print(f"✅ Gemini analysis complete ({elapsed_time:.1f}s)")
             
             if not response.text:
                 return None

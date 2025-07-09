@@ -168,8 +168,15 @@ Models:
         
         if best_frame_data:
             # Upload the best frame to Imgur
-            print("📤 Uploading best frame...")
-            image_url = upload_frame_to_imgur(best_frame_data["frame"])
+            print("📤 Uploading best frame to Imgur...")
+            import time
+            start_time = time.time()
+            image_url = upload_frame_to_imgur(best_frame_data["frame"], verbose=args.verbose)
+            upload_time = time.time() - start_time
+            if image_url:
+                print(f"✅ Upload complete ({upload_time:.1f}s)")
+            else:
+                print(f"⚠️  Upload failed ({upload_time:.1f}s)")
             
             # Display results
             print("\n" + "=" * 60)

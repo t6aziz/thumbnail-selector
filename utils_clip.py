@@ -8,6 +8,8 @@ to determine how well they match a given text prompt (e.g., "clickbait thumbnail
 import os
 import torch
 import clip
+import sys
+import time
 from PIL import Image
 from typing import List, Tuple, Optional, Dict
 
@@ -153,19 +155,26 @@ def score_with_clip(frames_data: List[Dict], prompt: str = "a clickbait YouTube 
     
     scores = []
     valid_frames = 0
+    total_frames = len(frames_data)
     
-    for frame_data in frames_data:
+    for i, frame_data in enumerate(frames_data):
         try:
+            # Show progress every 25% or every 5 frames
+            if (i + 1) % max(1, total_frames // 4) == 0 or (i + 1) % 5 == 0:
+                progress = ((i + 1) / total_frames) * 100
+                print(f"⏳ Processing frames with CLIP... {progress:.0f}% ({i + 1}/{total_frames})")
+            
             # Score the PIL image directly
             score = scorer.score_image_pil(frame_data["frame"], prompt)
             frame_name = f"frame_{frame_data['frame_number']:04d}"
             scores.append((frame_data, score))
-            print(f"📸 {frame_name}: {score:.4f}")
             valid_frames += 1
             
         except Exception as e:
             print(f"⚠️  Error processing frame {frame_data['frame_number']}: {e}")
             continue
+    
+    print(f"✅ Completed processing {valid_frames}/{total_frames} frames")
     
     if not scores:
         raise ValueError("No valid frames could be processed")
@@ -177,6 +186,7 @@ def score_with_clip(frames_data: List[Dict], prompt: str = "a clickbait YouTube 
     print("-" * 50)
     print(f"🏆 Best frame: {best_frame_name}")
     print(f"📊 Score: {best_score:.4f}")
+    print(f"🕐 Timestamp: {best_frame_data['timestamp']:.1f}s")
     print(f"✅ Processed {valid_frames}/{len(frames_data)} frames successfully")
     
     return best_frame_data, best_score
